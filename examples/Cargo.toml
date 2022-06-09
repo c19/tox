@@ -28,6 +28,14 @@ version = "0.6"
 features = ["codec", "net"]
 
 [[example]]
+name = "tox_proxy_client"
+path = "tox_proxy_client.rs"
+
+[[example]]
+name = "tox_proxy_server"
+path = "tox_proxy_server.rs"
+
+[[example]]
 name = "dht_server"
 path = "dht_server.rs"
 
@@ -46,3 +54,6 @@ path = "tcp_client.rs"
 [[example]]
 name = "tcp_server"
 path = "tcp_server.rs"
+
+[dependencies]
+crypto_box = "0.7.2"
