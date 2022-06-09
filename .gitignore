@@ -16,3 +16,6 @@ kcov/
 
 # some scripts
 .*.sh
+
+# data files
+*.data
