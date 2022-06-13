@@ -32,3 +32,5 @@ xsalsa20poly1305 = "0.8"
 aead = { version = "0.4", features = ["rand_core"] }
 rand = "0.8"
 crypto_box = "0.7"
+strum = { version = "0.24.1", features = ["derive"] }
+strum_macros = "0.24.1"

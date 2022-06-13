@@ -36,6 +36,7 @@ pub use self::errors::*;
 
 use nom::branch::alt;
 use nom::combinator::map;
+use strum::Display;
 
 use cookie_factory::{
     do_gen,
@@ -64,7 +65,7 @@ pub const MAX_DHT_PACKET_SIZE: usize = 2048;
 
 /** DHT packet enum that encapsulates all types of DHT packets.
 */
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Display, Eq, PartialEq)]
 pub enum Packet {
     /// [`PingRequest`](./struct.PingRequest.html) structure.
     PingRequest(PingRequest),

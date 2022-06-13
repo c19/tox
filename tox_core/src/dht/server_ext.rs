@@ -30,7 +30,8 @@ pub async fn dht_run_socket(
         while let Some(event) = stream.next().await {
             match event {
                 Ok((packet, addr)) => {
-                    trace!("Received packet {:?}", packet);
+                    debug!("Received packet {} <= {:?}", packet.to_string(), addr);
+                    trace!("Received packet from {:?} {:?}", addr, packet);
                     let res = udp.handle_packet(packet, addr).await;
 
                     if let Err(ref err) = res {
@@ -60,7 +61,7 @@ pub async fn dht_run_socket(
                     addr = SocketAddr::new(IpAddr::V6(ip.to_ipv6_mapped()), addr.port());
                 }
             }
-
+            debug!("Send {} => {:?}", packet.to_string(), addr);
             trace!("Sending packet {:?} to {:?}", packet, addr);
             sink.send((packet, addr)).await
                 .map_err(|e| Error::new(ErrorKind::Other, e))?
