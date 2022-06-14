@@ -577,6 +577,7 @@ impl OnionClient {
             Ok(payload) => payload,
             Err(e) => return Err(HandleDataResponseError::InvalidInnerPayload(e))
         };
+        debug!("Onion Iner Payload: {}", iner_payload.to_string());
         match iner_payload {
             OnionDataResponseInnerPayload::DhtPkAnnounce(dht_pk_announce) =>
                 self.handle_dht_pk_announce(payload.real_pk, dht_pk_announce).await

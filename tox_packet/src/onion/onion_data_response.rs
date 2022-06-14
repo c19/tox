@@ -3,6 +3,7 @@
 
 use super::*;
 
+use strum::Display;
 use aead::AeadCore;
 use tox_binary_io::*;
 use tox_crypto::*;
@@ -189,7 +190,7 @@ impl OnionDataResponsePayload {
 /** Packet that is embedded in the payload of
 [`OnionDataResponsePayload`](./struct.OnionDataResponsePayload.html).
 */
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Display, Eq, PartialEq)]
 pub enum OnionDataResponseInnerPayload {
     /// [`DhtPkAnnouncePayload`](../../dht/packet/struct.DhtPkAnnouncePayload.html) structure.
     DhtPkAnnounce(DhtPkAnnouncePayload),

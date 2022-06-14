@@ -241,6 +241,7 @@ impl FriendConnections {
 
                 if friend.saddr != Some(node.saddr) {
                     info!("Found a friend's IP address");
+                    debug!("Found a friend's IP address {:?}", node.saddr);
 
                     friend.saddr = Some(node.saddr);
 

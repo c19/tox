@@ -410,12 +410,16 @@ impl Server {
             return Ok(());
         }
 
+        trace!("close_nodes: {:?}", close_nodes);
+
         let nodes = close_nodes
-            .iter()
-            .flat_map(|node| node.to_all_packed_nodes())
-            .chain(self.initial_bootstrap.iter().cloned());
+        .iter()
+        .flat_map(|node| node.to_all_packed_nodes())
+        .chain(self.initial_bootstrap.iter().cloned());
+        trace!("initial_bootstrap: {:?}", self.initial_bootstrap);
 
         for node in nodes {
+            trace!("send_bootstrap_requests to {:?}", node);
             self.send_nodes_req(node, &mut request_queue, self.pk.clone()).await?;
         }
 
