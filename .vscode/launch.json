@@ -11,6 +11,14 @@
             "program": "${workspaceFolder}/target/debug/examples/tox_proxy_server",
             "args": [],
             "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "tox_proxy_client",
+            "program": "${workspaceFolder}/target/debug/examples/tox_proxy_client",
+            "args": [],
+            "cwd": "${workspaceFolder}"
         }
     ]
 }
