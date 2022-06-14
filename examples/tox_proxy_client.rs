@@ -1,4 +1,4 @@
-// an example of echo server with current code
+// an example of tox proxy client with current code
 //
 #![recursion_limit="256"]
 #![type_length_limit="4194304"]
@@ -10,7 +10,7 @@ use futures::{*, future::TryFutureExt};
 use futures::channel::mpsc;
 use hex::FromHex;
 use anyhow::Error;
-use rand::thread_rng;
+use rand::{thread_rng, RngCore};
 
 use std::net::SocketAddr;
 
@@ -46,6 +46,11 @@ mod common;
 //     ("82EF82BA33445A1F91A7DB27189ECFC0C013E06E3DA71F588ED692BED625EC23", "37.139.29.40:33445"),
 // ];
 
+fn as_u16_be(array: &[u8; 2]) -> u16 {
+    ((array[0] as u16) <<  8) +
+    ((array[1] as u16) <<  0)
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     env_logger::init();
@@ -63,11 +68,14 @@ async fn main() -> Result<(), Error> {
 
     // Create a channel for server to communicate with network
     let (tx, rx) = mpsc::channel(32);
-
-    let local_addr: SocketAddr = "0.0.0.0:33448".parse()?; // 0.0.0.0 for IPv4
+    let mut port: [u8; 2] = [0; 2];
+    rng.fill_bytes(&mut port);
+    let ip_port = format!("0.0.0.0:{:?}", as_u16_be(&port));
+    debug!("{}", ip_port);
+    let local_addr: SocketAddr = ip_port.parse()?; // 0.0.0.0 for IPv4
     // let local_addr: SocketAddr = "[::]:33445".parse()?; // [::] for IPv6
 
-    info!("Running echo server on {}", local_addr);
+    info!("Running tox proxy client on {}", local_addr);
 
     let socket = common::bind_socket(local_addr).await;
     let stats = Stats::new();
