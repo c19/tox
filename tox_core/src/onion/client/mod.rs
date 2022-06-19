@@ -17,6 +17,7 @@ use futures::lock::Mutex;
 use rand::{thread_rng, Rng};
 
 use tox_crypto::*;
+use tox_packet::toxid::NoSpam;
 use crate::dht::ip_port::IsGlobal;
 use tox_packet::dht::packed_node::PackedNode;
 use tox_packet::dht::*;
@@ -100,6 +101,10 @@ pub(crate) const TIME_TO_STABLE: Duration = Duration::from_secs(ONION_NODE_PING_
 const ONION_DHTPK_SEND_INTERVAL: Duration = Duration::from_secs(30);
 
 /// The interval of time at which to tell our friends our DHT `PublicKey`
+/// via onion.
+const ONION_FRIEND_REQUEST_SEND_INTERVAL: Duration = Duration::from_secs(2);
+
+/// The interval of time at which to tell our friends our DHT `PublicKey`
 /// via DHT request.
 const DHT_DHTPK_SEND_INTERVAL: Duration = Duration::from_secs(20);
 
@@ -114,6 +119,10 @@ struct OnionFriend {
     real_pk: PublicKey,
     /// Friend's DHT `PublicKey` if it's known.
     dht_pk: Option<PublicKey>,
+    /// Friend's nospam value, exists when added via ToxId
+    nospam: NoSpam,
+    /// the msg send with FriendRequest, default empty
+    add_msg: String,
     /// Temporary `PublicKey` that should be used to encrypt search requests for
     /// this friend.
     temporary_pk: PublicKey,
@@ -125,6 +134,9 @@ struct OnionFriend {
     /// `no_reply` from last DHT `PublicKey` announce packet used to prevent
     /// reply attacks.
     last_no_reply: u64,
+    /// Time when we sent FriendRequest to this friend via onion last
+    /// time.
+    last_friend_request_onion_sent: Option<Instant>,
     /// Time when our DHT `PublicKey` was sent to this friend via onion last
     /// time.
     last_dht_pk_onion_sent: Option<Instant>,
@@ -147,10 +159,13 @@ impl OnionFriend {
         OnionFriend {
             real_pk,
             dht_pk: None,
+            nospam: NoSpam([0, 0, 0, 0]),
+            add_msg: "from client".to_string(),
             temporary_pk,
             temporary_sk,
             close_nodes: Kbucket::new(MAX_ONION_FRIEND_NODES),
             last_no_reply: 0,
+            last_friend_request_onion_sent: None,
             last_dht_pk_onion_sent: None,
             last_dht_pk_dht_sent: None,
             search_count: 0,
@@ -532,6 +547,7 @@ impl OnionClient {
     pub async fn handle_dht_pk_announce(&self, friend_pk: PublicKey, dht_pk_announce: DhtPkAnnouncePayload) -> Result<(), HandleDhtPkAnnounceError> {
         let mut state = self.state.lock().await;
 
+        info!("Got PK Announce: {:?}", friend_pk);
         let friend = match state.friends.get_mut(&friend_pk) {
             Some(friend) => friend,
             None => return Err(HandleDhtPkAnnounceError::NoFriendWithPk)
@@ -823,6 +839,53 @@ impl OnionClient {
         Ok(())
     }
 
+    /// Announce our DHT `PublicKey` to a friend via onion.
+    async fn send_friend_request_onion(&self, friend: &mut OnionFriend, paths_pool: &mut PathsPool) -> Result<(), mpsc::SendError> {
+        let mut rng = thread_rng();
+        let friend_request = FriendRequest::new(friend.nospam, friend.add_msg.clone());
+        let inner_payload = OnionDataResponseInnerPayload::FriendRequest(friend_request);
+        let nonce = crypto_box::generate_nonce(&mut rand::thread_rng()).into();
+        let payload = OnionDataResponsePayload::new(
+            &SalsaBox::new(&friend.real_pk, &self.real_sk),
+            self.real_pk.clone(),
+            &nonce,
+            &inner_payload,
+        );
+
+        let mut packets_sent = false;
+
+        for node in friend.close_nodes.iter() {
+            if node.is_timed_out() {
+                continue;
+            }
+
+            let data_pk = if let Some(ref data_pk) = node.data_pk {
+                data_pk.clone()
+            } else {
+                continue
+            };
+
+            let path = if let Some(path) = paths_pool.get_or_random_path(&self.dht, &self.tcp_connections, node.path_id.clone(), true).await {
+                path
+            } else {
+                continue
+            };
+
+            let temporary_sk = SecretKey::generate(&mut rng);
+            let temporary_pk = temporary_sk.public_key();
+            let inner_data_request = InnerOnionDataRequest::new(&SalsaBox::new(&data_pk, &temporary_sk), friend.real_pk.clone(), temporary_pk, nonce, &payload);
+
+            self.send_onion_request(path, InnerOnionRequest::InnerOnionDataRequest(inner_data_request), node.saddr).await?;
+            packets_sent = true;
+        }
+
+        if packets_sent {
+            friend.last_friend_request_onion_sent = Some(clock_now());
+        }
+
+        Ok(())
+    }
+
     /// Announce our DHT `PublicKey` to a friend via `DhtRequest`.
     async fn send_dht_pk_dht_request(&self, friend: &mut OnionFriend) -> Result<(), mpsc::SendError> {
         let friend_dht_pk = if let Some(ref friend_dht_pk) = friend.dht_pk {
@@ -902,6 +965,10 @@ impl OnionClient {
 
             if friend.last_dht_pk_onion_sent.map_or(true, |time| clock_elapsed(time) > ONION_DHTPK_SEND_INTERVAL) {
                 self.send_dht_pk_onion(friend, &mut state.paths_pool).await.map_err(RunError::SendTo)?;
+            }
+
+            if friend.last_friend_request_onion_sent.map_or(true, |time| clock_elapsed(time) > ONION_FRIEND_REQUEST_SEND_INTERVAL) {
+                self.send_friend_request_onion(friend, &mut state.paths_pool).await.map_err(RunError::SendTo)?;
             }
 
             if friend.last_dht_pk_dht_sent.map_or(true, |time| clock_elapsed(time) > DHT_DHTPK_SEND_INTERVAL) {

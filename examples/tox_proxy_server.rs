@@ -94,11 +94,13 @@ async fn main() -> Result<(), Error> {
     env_logger::init();
 
     let (dht_sk, real_sk, id) = load_or_gen_keys();
-    debug!("dht_sk: {}", dht_sk.as_bytes().encode_hex_upper::<String>());
-    debug!("real_sk: {}", real_sk.as_bytes().encode_hex_upper::<String>());
-    debug!("tox_id: {:X}", id);
     let dht_pk = dht_sk.public_key();
     let real_pk = real_sk.public_key();
+    debug!("dht_sk: {}", dht_sk.as_bytes().encode_hex_upper::<String>());
+    info!("dht_pk: {}", dht_pk.as_bytes().encode_hex_upper::<String>());
+    debug!("real_sk: {}", real_sk.as_bytes().encode_hex_upper::<String>());
+    info!("real_pk: {}", real_pk.as_bytes().encode_hex_upper::<String>());
+    info!("tox_id: {:X}", id);
 
     // Create a channel for server to communicate with network
     let (tx, rx) = mpsc::channel(32);
@@ -106,7 +108,7 @@ async fn main() -> Result<(), Error> {
     let local_addr: SocketAddr = "0.0.0.0:33447".parse()?; // 0.0.0.0 for IPv4
     // let local_addr: SocketAddr = "[::]:33445".parse()?; // [::] for IPv6
 
-    info!("Running echo server on {}", local_addr);
+    info!("Running server on {}", local_addr);
 
     let socket = common::bind_socket(local_addr).await;
     let stats = Stats::new();
