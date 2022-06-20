@@ -12,8 +12,11 @@ use hex::FromHex;
 use anyhow::Error;
 use rand::{thread_rng, RngCore};
 
+use std::fs::{self, File};
+use std::io::BufReader;
 use std::net::SocketAddr;
-
+use std::path::Path;
+use std::io::BufRead;
 use tox_binary_io::*;
 use tox_crypto::*;
 use tox_packet::dht::packed_node::PackedNode;
@@ -51,9 +54,29 @@ fn as_u16_be(array: &[u8; 2]) -> u16 {
     ((array[1] as u16) <<  0)
 }
 
+fn load_server_ids() -> Vec<ToxId> {
+    let ids_file = "tox_proxy_server_ids.data";
+    let mut ids: Vec<ToxId> = vec![];
+    if Path::new(ids_file).exists() {
+        let file = File::open(ids_file).expect("open tox_proxy_server_ids.data falied");
+        let reader = BufReader::new(file);
+        let mut str: String;
+        for line in reader.lines() {
+            str = line.expect("read tox_proxy_server_ids.data line failed.");
+            let res = hex::decode(str).expect("hex decode failed.");
+            let bytes = &res[..];
+            let (_, id) = ToxId::from_bytes(bytes).expect("decode toxid failed.");
+            ids.push(id);
+        }
+    }
+    return ids;
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     env_logger::init();
+
+    let server_ids = load_server_ids();
 
     let mut rng = thread_rng();
 
@@ -119,6 +142,14 @@ async fn main() -> Result<(), Error> {
         onion_client.clone(),
         net_crypto.clone(),
     );
+
+    // add server as friends via tox id.
+    for tox_id in server_ids {
+        info!("add server: {tox_id}");
+        friend_connections.tox_add_friend(tox_id, String::from("hi from client")).await;
+    }
+
+    // friend_connections.send_friend_request(ToxId::from("DEE4D475E4B96386E8A6454D70DC7DBF4A6DC7D16BA285CCA3F640BFB1F6AC51BEFE261828FC"));
 
     // Bootstrap from nodes
     for &(pk, saddr) in &common::BOOTSTRAP_NODES {
@@ -193,7 +224,9 @@ async fn main() -> Result<(), Error> {
                 0x40 => { // PACKET_ID_CHAT_MESSAGE
                     net_crypto_c.send_lossless(pk, packet).map_err(Error::from).await?;
                 },
-                _ => { },
+                _ => {
+                    info!("lossless packet: {:?}", String::from_utf8_lossy(&packet));
+                },
             }
         }
         Result::<(), Error>::Ok(())

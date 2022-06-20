@@ -1,4 +1,4 @@
-// an example of echo server with current code
+// an example of server with current code
 //
 #![recursion_limit="256"]
 #![type_length_limit="4194304"]
@@ -61,7 +61,7 @@ fn load_or_gen_keys() -> (SecretKey, SecretKey, ToxId) {
         let real_sk_slice: [u8; KEY_SIZE] = raw[KEY_SIZE..KEY_SIZE*2].try_into().expect("parse tox_proxy_server.data failed.");
         let real_sk = SecretKey::from(real_sk_slice);
 
-        let tox_id_slice = &raw[KEY_SIZE*2..KEY_SIZE*2+TOXIDBYTES]; //.try_into().expect("parse tox_proxy_server.data failed.");
+        let tox_id_slice = &raw[KEY_SIZE*2..KEY_SIZE*2+TOXIDBYTES];
         let (_, tox_id) = ToxId::from_bytes(tox_id_slice).expect("deserialize tox_id failed.");
 
         return (dht_sk, real_sk, tox_id);
@@ -89,9 +89,21 @@ fn load_or_gen_keys() -> (SecretKey, SecretKey, ToxId) {
     }
 }
 
+fn load_server_message() -> Vec<u8> {
+    let message_file = "tox_proxy_server_message.data";
+    if Path::new(message_file).exists() {
+        let raw = fs::read(message_file).expect("read tox_proxy_server.data failed.");
+        return raw;
+    }else{
+        return "hi from server".as_bytes().to_vec();
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Error> {
     env_logger::init();
+
+    let mut server_message = load_server_message();
 
     let (dht_sk, real_sk, id) = load_or_gen_keys();
     let dht_pk = dht_sk.public_key();
@@ -105,7 +117,7 @@ async fn main() -> Result<(), Error> {
     // Create a channel for server to communicate with network
     let (tx, rx) = mpsc::channel(32);
 
-    let local_addr: SocketAddr = "0.0.0.0:33447".parse()?; // 0.0.0.0 for IPv4
+    let local_addr: SocketAddr = "0.0.0.0:33499".parse()?; // 0.0.0.0 for IPv4
     // let local_addr: SocketAddr = "[::]:33445".parse()?; // [::] for IPv6
 
     info!("Running server on {}", local_addr);
@@ -226,7 +238,9 @@ async fn main() -> Result<(), Error> {
                 0x40 => { // PACKET_ID_CHAT_MESSAGE
                     net_crypto_c.send_lossless(pk, packet).map_err(Error::from).await?;
                 },
-                _ => { },
+                _ => {
+                    info!("lossless packet: {:?}", packet);
+                },
             }
         }
         Result::<(), Error>::Ok(())
@@ -236,14 +250,28 @@ async fn main() -> Result<(), Error> {
     let friend_connection_c = friend_connections.clone();
     let friend_future = async {
         while let Some((pk, _)) = friend_request_sink_rx.next().await {
+            info!("friend request: {}", pk.as_bytes().encode_hex_upper::<String>());
             friend_connection_c.add_friend(pk).await;
         }
         Result::<(), Error>::Ok(())
     };
 
+    // handle friend connected event
+    let (friend_connection_status_tx, mut friend_connection_status_sink_rx) = mpsc::unbounded();
+    friend_connections.set_connection_status_sink(friend_connection_status_tx).await;
+    let friend_connected_future = async {
+        while let Some((pk, connected)) = friend_connection_status_sink_rx.next().await {
+            info!("friend connected: {:?} {:?}", pk.as_bytes().encode_hex_upper::<String>(), connected);
+            let mut msg = vec![0x30];
+            msg.extend(&server_message);
+            net_crypto_c.send_lossless(pk, msg).map_err(Error::from).await?;
+        }
+        Result::<(), Error>::Ok(())
+    };
+
     let lossy_future = async {
-        while lossy_rx.next().await.is_some() {
-            // ignore
+        while let Some((_pk, packet)) = lossy_rx.next().await {
+            info!("lossy packet: {:?}", packet);
         }
         Result::<(), Error>::Ok(())
     };
@@ -270,5 +298,6 @@ async fn main() -> Result<(), Error> {
         res = lossless_future.fuse() => res,
         res = lossy_future.fuse() => res,
         res = friend_future.fuse() => res,
+        res = friend_connected_future.fuse() => res,
     )
 }

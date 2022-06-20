@@ -17,7 +17,7 @@ use futures::lock::Mutex;
 use rand::{thread_rng, Rng};
 
 use tox_crypto::*;
-use tox_packet::toxid::NoSpam;
+use tox_packet::toxid::{NoSpam, ToxId};
 use crate::dht::ip_port::IsGlobal;
 use tox_packet::dht::packed_node::PackedNode;
 use tox_packet::dht::*;
@@ -160,6 +160,26 @@ impl OnionFriend {
             real_pk,
             dht_pk: None,
             nospam: NoSpam([0, 0, 0, 0]),
+            add_msg: "from client".to_string(),
+            temporary_pk,
+            temporary_sk,
+            close_nodes: Kbucket::new(MAX_ONION_FRIEND_NODES),
+            last_no_reply: 0,
+            last_friend_request_onion_sent: None,
+            last_dht_pk_onion_sent: None,
+            last_dht_pk_dht_sent: None,
+            search_count: 0,
+            last_seen: None,
+            connected: false,
+        }
+    }
+    pub fn from_tox_id(tox_id: ToxId) -> Self {
+        let temporary_sk = SecretKey::generate(&mut thread_rng());
+        let temporary_pk = temporary_sk.public_key();
+        OnionFriend {
+            real_pk: tox_id.pk,
+            dht_pk: None,
+            nospam: tox_id.nospam,
             add_msg: "from client".to_string(),
             temporary_pk,
             temporary_sk,
@@ -611,6 +631,13 @@ impl OnionClient {
         let mut state = self.state.lock().await;
 
         state.paths_pool.path_nodes.put(node);
+    }
+
+    /// Add a friend via ToxId
+    pub async fn tox_add_friend(&self, tox_id: ToxId) {
+        let mut state = self.state.lock().await;
+
+        state.friends.insert(tox_id.pk.clone(), OnionFriend::from_tox_id(tox_id));
     }
 
     /// Add a friend to start looking for its DHT `PublicKey`.

@@ -113,7 +113,7 @@ pub struct ToxId {
     /// Long-term `PublicKey`.
     pub pk: PublicKey,
     /// `NoSpam`.
-    nospam: NoSpam,
+    pub nospam: NoSpam,
     checksum: [u8; 2],
 }
 

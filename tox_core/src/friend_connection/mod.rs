@@ -15,7 +15,10 @@ use tokio::sync::RwLock;
 
 use tox_binary_io::*;
 use tox_crypto::*;
+use tox_packet::onion::{FriendRequest, InnerOnionRequest};
+use tox_packet::toxid::{ToxId, NoSpam};
 use crate::dht::dht_node::BAD_NODE_TIMEOUT;
+use crate::onion::client::errors::HandleAnnounceResponseError;
 use tox_packet::dht::packed_node::PackedNode;
 use crate::dht::server::Server as DhtServer;
 use crate::friend_connection::errors::*;
@@ -48,11 +51,27 @@ const MAIN_LOOP_INTERVAL: Duration = Duration::from_secs(1);
 /// address will be considered timed out.
 const FRIEND_DHT_TIMEOUT: Duration = BAD_NODE_TIMEOUT;
 
+#[derive(Clone, Debug)]
+pub enum FriendshipStatus {
+    FRIEND_ADDED,
+    FRIEND_CONFIRMED,
+    FRIEND_ONLINE,
+    FRIEND_REQUESTED,
+    NOFRIEND,
+}
+
+
 /// Friend related data stored in the friend connections module.
 #[derive(Clone, Debug)]
 struct Friend {
     /// Friend's long term `PublicKey`.
     real_pk: PublicKey,
+    /// Friend's nospam value, exists when added via ToxId
+    nosapm: Option<NoSpam>,
+    /// the msg send with FriendRequest, default empty
+    add_msg: String,
+    /// mark on the stage of the friendship
+    status: FriendshipStatus,
     /// Friend's DHT `PublicKey` when it's known.
     dht_pk: Option<PublicKey>,
     /// Friend's IP address when it's known.
@@ -72,9 +91,29 @@ struct Friend {
 }
 
 impl Friend {
+    pub fn from_tox_id(tox_id: ToxId, msg: String) -> Self {
+        Friend {
+            real_pk: tox_id.pk,
+            nosapm: Some(tox_id.nospam),
+            add_msg: "".to_string(),
+            status: FriendshipStatus::NOFRIEND,
+            dht_pk: None,
+            saddr: None,
+            dht_pk_time: None,
+            saddr_time: None,
+            connected: false,
+            ping_sent_time: None,
+            ping_received_time: None,
+            share_relays_time: None,
+        }
+    }
+
     pub fn new(real_pk: PublicKey) -> Self {
         Friend {
             real_pk,
+            nosapm: None,
+            add_msg: "".to_string(),
+            status: FriendshipStatus::NOFRIEND,
             dht_pk: None,
             saddr: None,
             dht_pk_time: None,
@@ -131,11 +170,26 @@ impl FriendConnections {
         }
     }
 
+    // Add a friend via ToxID
+    pub async fn tox_add_friend(&self, friend_tox_id: ToxId, msg: String) {
+        let friend_pk = friend_tox_id.pk.clone();
+        let mut friends = self.friends.write().await;
+        if let Entry::Vacant(entry) = friends.entry(friend_pk.clone()) {
+            let mut friend = Friend::from_tox_id(friend_tox_id, msg);
+            friend.status = FriendshipStatus::FRIEND_ADDED;
+            entry.insert(friend);
+            self.onion_client.add_friend(friend_pk.clone()).await;
+            self.net_crypto.add_friend(friend_pk).await;
+        }
+    }
+
     /// Add a friend we want to be connected to.
     pub async fn add_friend(&self, friend_pk: PublicKey) {
         let mut friends = self.friends.write().await;
         if let Entry::Vacant(entry) = friends.entry(friend_pk.clone()) {
-            entry.insert(Friend::new(friend_pk.clone()));
+            let mut friend = Friend::new(friend_pk.clone());
+            friend.status = FriendshipStatus::FRIEND_ADDED;
+            entry.insert(friend);
             self.onion_client.add_friend(friend_pk.clone()).await;
             self.net_crypto.add_friend(friend_pk).await;
         }
@@ -169,6 +223,7 @@ impl FriendConnections {
         if let Some(friend) = self.friends.read().await.get(&friend_pk) {
             if let Some(ref dht_pk) = friend.dht_pk {
                 for node in share_relays.relays {
+                    warn!("add_relay_connection: {:?} {:?} {:?}", node.saddr, node.pk, dht_pk);
                     self.tcp_connections.add_relay_connection(node.saddr, node.pk, dht_pk.clone()).await
                         .map_err(HandleShareRelaysError::AddTcpConnection)?;
                 }
@@ -197,7 +252,7 @@ impl FriendConnections {
                 friend.dht_pk_time = Some(clock_now());
 
                 if friend.dht_pk.as_ref() != Some(&dht_pk) {
-                    info!("Found a friend's DHT key");
+                    warn!("Found a friend's DHT key: {:?} {:?}", friend.real_pk, dht_pk);
 
                     if let Some(ref dht_pk) = friend.dht_pk {
                         dht.remove_friend(dht_pk.clone()).await;
@@ -241,7 +296,7 @@ impl FriendConnections {
 
                 if friend.saddr != Some(node.saddr) {
                     info!("Found a friend's IP address");
-                    debug!("Found a friend's IP address {:?}", node.saddr);
+                    warn!("Found a friend's IP address {:?}", node.saddr);
 
                     friend.saddr = Some(node.saddr);
 
@@ -356,6 +411,8 @@ impl FriendConnections {
                     if let Some(saddr) = friend.saddr {
                         self.net_crypto.set_friend_udp_addr(friend.real_pk.clone(), saddr).await;
                     }
+                    // got friend's dht pk, tries to send friend request
+
                 }
             }
         }
@@ -400,6 +457,7 @@ impl FriendConnections {
 
         let dht_pk_future = self.handle_dht_pk(&mut dht_pk_rx);
         let friend_saddr_future = self.handle_friend_saddr(&mut friend_saddr_rx);
+        // let send_friend_request_future = self.send_friend_request();
         let connection_status_future = self.handle_connection_status(&mut connection_status_rx);
         let main_loop_future = self.run_main_loop();
 
