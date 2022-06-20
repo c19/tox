@@ -36,8 +36,8 @@ jobs:
         prerelease: true
         title: "Development Build"
         files: |
-          tox_proxy_server
-          tox_proxy_client
+          target/debug/examples/tox_proxy_server
+          target/debug/examples/tox_proxy_client
 
   clippy:
     name: Clippy
