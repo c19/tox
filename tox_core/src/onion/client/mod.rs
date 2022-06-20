@@ -967,12 +967,23 @@ impl OnionClient {
                 self.send_dht_pk_onion(friend, &mut state.paths_pool).await.map_err(RunError::SendTo)?;
             }
 
-            if friend.last_friend_request_onion_sent.map_or(true, |time| clock_elapsed(time) > ONION_FRIEND_REQUEST_SEND_INTERVAL) {
-                self.send_friend_request_onion(friend, &mut state.paths_pool).await.map_err(RunError::SendTo)?;
-            }
-
             if friend.last_dht_pk_dht_sent.map_or(true, |time| clock_elapsed(time) > DHT_DHTPK_SEND_INTERVAL) {
                 self.send_dht_pk_dht_request(friend).await.map_err(RunError::SendTo)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Search friends periodically.
+    async fn friend_request_loop(&self, state: &mut OnionClientState) -> Result<(), RunError> {
+        for friend in state.friends.values_mut() {
+            if friend.connected {
+                continue;
+            }
+
+            if friend.last_friend_request_onion_sent.map_or(true, |time| clock_elapsed(time) > ONION_FRIEND_REQUEST_SEND_INTERVAL) {
+                self.send_friend_request_onion(friend, &mut state.paths_pool).await.map_err(RunError::SendTo)?;
             }
         }
 
@@ -1001,6 +1012,7 @@ impl OnionClient {
 
             self.announce_loop(&mut state).await?;
             self.friends_loop(&mut state).await?;
+            self.friend_request_loop(&mut state).await?;
         }
     }
 }
