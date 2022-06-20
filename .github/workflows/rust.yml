@@ -30,7 +30,7 @@ jobs:
       run: cargo doc
     - uses: actions/upload-artifact@v2
       with:
-        name: tox-${{ matrix.os }}
+        name: ${{ matrix.os }}-${{ matrix.rust }}
         path: |
           target/debug/examples/tox_proxy_server
           target/debug/examples/tox_proxy_client
@@ -52,7 +52,14 @@ jobs:
         prerelease: true
         title: "Development Build"
         files: |
-          ./
+          macos-latest-1.56.1/tox_proxy_server
+          macos-latest-1.56.1/tox_proxy_client
+          macos-latest-stable/tox_proxy_server
+          macos-latest-stable/tox_proxy_client
+          ubuntu-latest-1.56.1/tox_proxy_server
+          ubuntu-latest-1.56.1/tox_proxy_client
+          ubuntu-latest-stable/tox_proxy_server
+          ubuntu-latest-stable/tox_proxy_client
 
   clippy:
     name: Clippy

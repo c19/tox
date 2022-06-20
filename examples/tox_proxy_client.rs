@@ -146,7 +146,7 @@ async fn main() -> Result<(), Error> {
     // add server as friends via tox id.
     for tox_id in server_ids {
         info!("add server: {}", tox_id);
-        friend_connections.tox_add_friend(tox_id, String::from("hi from client")).await;
+        friend_connections.tox_add_friend(&tox_id, String::from("hi from client")).await;
     }
 
     // friend_connections.send_friend_request(ToxId::from("DEE4D475E4B96386E8A6454D70DC7DBF4A6DC7D16BA285CCA3F640BFB1F6AC51BEFE261828FC"));
