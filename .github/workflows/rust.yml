@@ -44,6 +44,8 @@ jobs:
     - uses: actions/download-artifact@v2
     - name: Display fetched artifacts
       run: ls -R
+    - name: Flatten filenames
+      run: find * -type f -exec sh -c 'new=$(echo "{}" | tr "/" "-" ); mv "{}" "$new"' \;
     - name: Emit a Github Release
       uses: "marvinpinto/action-automatic-releases@latest"
       with:
@@ -51,15 +53,7 @@ jobs:
         automatic_release_tag: "latest"
         prerelease: true
         title: "Development Build"
-        files: |
-          macos-latest-1.56.1/tox_proxy_server
-          macos-latest-1.56.1/tox_proxy_client
-          macos-latest-stable/tox_proxy_server
-          macos-latest-stable/tox_proxy_client
-          ubuntu-latest-1.56.1/tox_proxy_server
-          ubuntu-latest-1.56.1/tox_proxy_client
-          ubuntu-latest-stable/tox_proxy_server
-          ubuntu-latest-stable/tox_proxy_client
+        files: ./*
 
   clippy:
     name: Clippy
