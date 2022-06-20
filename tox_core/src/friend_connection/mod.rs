@@ -15,10 +15,8 @@ use tokio::sync::RwLock;
 
 use tox_binary_io::*;
 use tox_crypto::*;
-use tox_packet::onion::{FriendRequest, InnerOnionRequest};
-use tox_packet::toxid::{ToxId, NoSpam};
+use tox_packet::toxid::{ToxId};
 use crate::dht::dht_node::BAD_NODE_TIMEOUT;
-use crate::onion::client::errors::HandleAnnounceResponseError;
 use tox_packet::dht::packed_node::PackedNode;
 use crate::dht::server::Server as DhtServer;
 use crate::friend_connection::errors::*;
@@ -51,27 +49,11 @@ const MAIN_LOOP_INTERVAL: Duration = Duration::from_secs(1);
 /// address will be considered timed out.
 const FRIEND_DHT_TIMEOUT: Duration = BAD_NODE_TIMEOUT;
 
-#[derive(Clone, Debug)]
-pub enum FriendshipStatus {
-    FRIEND_ADDED,
-    FRIEND_CONFIRMED,
-    FRIEND_ONLINE,
-    FRIEND_REQUESTED,
-    NOFRIEND,
-}
-
-
 /// Friend related data stored in the friend connections module.
 #[derive(Clone, Debug)]
 struct Friend {
     /// Friend's long term `PublicKey`.
     real_pk: PublicKey,
-    /// Friend's nospam value, exists when added via ToxId
-    nosapm: Option<NoSpam>,
-    /// the msg send with FriendRequest, default empty
-    add_msg: String,
-    /// mark on the stage of the friendship
-    status: FriendshipStatus,
     /// Friend's DHT `PublicKey` when it's known.
     dht_pk: Option<PublicKey>,
     /// Friend's IP address when it's known.
@@ -94,9 +76,6 @@ impl Friend {
     pub fn from_tox_id(tox_id: ToxId, msg: String) -> Self {
         Friend {
             real_pk: tox_id.pk,
-            nosapm: Some(tox_id.nospam),
-            add_msg: "".to_string(),
-            status: FriendshipStatus::NOFRIEND,
             dht_pk: None,
             saddr: None,
             dht_pk_time: None,
@@ -111,9 +90,6 @@ impl Friend {
     pub fn new(real_pk: PublicKey) -> Self {
         Friend {
             real_pk,
-            nosapm: None,
-            add_msg: "".to_string(),
-            status: FriendshipStatus::NOFRIEND,
             dht_pk: None,
             saddr: None,
             dht_pk_time: None,
@@ -175,8 +151,7 @@ impl FriendConnections {
         let friend_pk = friend_tox_id.pk.clone();
         let mut friends = self.friends.write().await;
         if let Entry::Vacant(entry) = friends.entry(friend_pk.clone()) {
-            let mut friend = Friend::from_tox_id(friend_tox_id, msg);
-            friend.status = FriendshipStatus::FRIEND_ADDED;
+            let friend = Friend::from_tox_id(friend_tox_id, msg);
             entry.insert(friend);
             self.onion_client.add_friend(friend_pk.clone()).await;
             self.net_crypto.add_friend(friend_pk).await;
@@ -187,8 +162,7 @@ impl FriendConnections {
     pub async fn add_friend(&self, friend_pk: PublicKey) {
         let mut friends = self.friends.write().await;
         if let Entry::Vacant(entry) = friends.entry(friend_pk.clone()) {
-            let mut friend = Friend::new(friend_pk.clone());
-            friend.status = FriendshipStatus::FRIEND_ADDED;
+            let friend = Friend::new(friend_pk.clone());
             entry.insert(friend);
             self.onion_client.add_friend(friend_pk.clone()).await;
             self.net_crypto.add_friend(friend_pk).await;

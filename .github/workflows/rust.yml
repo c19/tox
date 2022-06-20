@@ -52,12 +52,7 @@ jobs:
         prerelease: true
         title: "Development Build"
         files: |
-          tox-windows-latest/target/debug/examples/tox_proxy_server
-          tox-windows-latest/target/debug/examples/tox_proxy_client
-          tox-macos-latest/target/debug/examples/tox_proxy_server
-          tox-macos-latest/target/debug/examples/tox_proxy_client
-          tox-ubuntu-latest/target/debug/examples/tox_proxy_server
-          tox-ubuntu-latest/target/debug/examples/tox_proxy_client
+          ./
 
   clippy:
     name: Clippy
