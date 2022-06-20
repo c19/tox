@@ -28,16 +28,36 @@ jobs:
       run: cargo test --verbose
     - name: Build docs
       run: cargo doc
-    - name: Automatic Releases
-      uses: marvinpinto/action-automatic-releases@v1.2.1
+    - uses: actions/upload-artifact@v2
+      with:
+        name: tox-${{ matrix.os }}
+        path: |
+          target/debug/examples/tox_proxy_server
+          target/debug/examples/tox_proxy_client
+        retention-days: 1
+
+  release:
+    name: "Dev Release"
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v2
+    - name: Display fetched artifacts
+      run: ls -R
+    - name: Emit a Github Release
+      uses: "marvinpinto/action-automatic-releases@latest"
       with:
         repo_token: "${{ secrets.GITHUB_TOKEN }}"
         automatic_release_tag: "latest"
         prerelease: true
         title: "Development Build"
         files: |
-          target/debug/examples/tox_proxy_server
-          target/debug/examples/tox_proxy_client
+          tox-windows-latest/target/debug/examples/tox_proxy_server
+          tox-windows-latest/target/debug/examples/tox_proxy_client
+          tox-macos-latest/target/debug/examples/tox_proxy_server
+          tox-macos-latest/target/debug/examples/tox_proxy_client
+          tox-ubuntu-latest/target/debug/examples/tox_proxy_server
+          tox-ubuntu-latest/target/debug/examples/tox_proxy_client
 
   clippy:
     name: Clippy
