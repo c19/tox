@@ -51,6 +51,11 @@ To build docs and open them in your browser:
 cargo doc --open
 ```
 
+## Cross build using Docker
+```
+./scripts/build.sh
+```
+
 ### With clippy
 To check for [clippy](https://github.com/rust-lang-nursery/rust-clippy) warnings
 (linting), you need nightly Rust with `clippy-preview` component.
