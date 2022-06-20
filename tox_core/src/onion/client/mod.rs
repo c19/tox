@@ -173,14 +173,14 @@ impl OnionFriend {
             connected: false,
         }
     }
-    pub fn from_tox_id(tox_id: ToxId) -> Self {
+    pub fn from_tox_id(tox_id: &ToxId, add_msg: String) -> Self {
         let temporary_sk = SecretKey::generate(&mut thread_rng());
         let temporary_pk = temporary_sk.public_key();
         OnionFriend {
-            real_pk: tox_id.pk,
+            real_pk: tox_id.pk.clone(),
             dht_pk: None,
             nospam: tox_id.nospam,
-            add_msg: "from client".to_string(),
+            add_msg,
             temporary_pk,
             temporary_sk,
             close_nodes: Kbucket::new(MAX_ONION_FRIEND_NODES),
@@ -634,10 +634,10 @@ impl OnionClient {
     }
 
     /// Add a friend via ToxId
-    pub async fn tox_add_friend(&self, tox_id: ToxId) {
+    pub async fn tox_add_friend(&self, tox_id: &ToxId, msg: String) {
         let mut state = self.state.lock().await;
 
-        state.friends.insert(tox_id.pk.clone(), OnionFriend::from_tox_id(tox_id));
+        state.friends.insert(tox_id.pk.clone(), OnionFriend::from_tox_id(tox_id, msg));
     }
 
     /// Add a friend to start looking for its DHT `PublicKey`.

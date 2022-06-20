@@ -73,9 +73,9 @@ struct Friend {
 }
 
 impl Friend {
-    pub fn from_tox_id(tox_id: ToxId, msg: String) -> Self {
+    pub fn from_tox_id(tox_id: &ToxId) -> Self {
         Friend {
-            real_pk: tox_id.pk,
+            real_pk: tox_id.pk.clone(),
             dht_pk: None,
             saddr: None,
             dht_pk_time: None,
@@ -147,13 +147,13 @@ impl FriendConnections {
     }
 
     // Add a friend via ToxID
-    pub async fn tox_add_friend(&self, friend_tox_id: ToxId, msg: String) {
+    pub async fn tox_add_friend(&self, friend_tox_id: &ToxId, msg: String) {
         let friend_pk = friend_tox_id.pk.clone();
         let mut friends = self.friends.write().await;
         if let Entry::Vacant(entry) = friends.entry(friend_pk.clone()) {
-            let friend = Friend::from_tox_id(friend_tox_id, msg);
+            let friend = Friend::from_tox_id(friend_tox_id);
             entry.insert(friend);
-            self.onion_client.add_friend(friend_pk.clone()).await;
+            self.onion_client.tox_add_friend(friend_tox_id, msg).await;
             self.net_crypto.add_friend(friend_pk).await;
         }
     }
