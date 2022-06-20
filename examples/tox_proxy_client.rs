@@ -12,7 +12,7 @@ use hex::FromHex;
 use anyhow::Error;
 use rand::{thread_rng, RngCore};
 
-use std::fs::{self, File};
+use std::fs::{File};
 use std::io::BufReader;
 use std::net::SocketAddr;
 use std::path::Path;
@@ -69,7 +69,7 @@ fn load_server_ids() -> Vec<ToxId> {
             ids.push(id);
         }
     }
-    return ids;
+    ids
 }
 
 #[tokio::main]

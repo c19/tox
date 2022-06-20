@@ -26,7 +26,7 @@ use tox_packet::relay::DataPayload;
 use tox_packet::toxid::{ToxId, TOXIDBYTES};
 use tox_core::dht::server::Server as DhtServer;
 use tox_core::dht::server_ext::dht_run_socket;
-use tox_core::dht::lan_discovery::LanDiscoverySender;
+
 use tox_core::udp::Server as UdpServer;
 use tox_core::friend_connection::FriendConnections;
 use tox_core::net_crypto::{NetCrypto, NetCryptoNewArgs};
@@ -64,7 +64,7 @@ fn load_or_gen_keys() -> (SecretKey, SecretKey, ToxId) {
         let tox_id_slice = &raw[KEY_SIZE*2..KEY_SIZE*2+TOXIDBYTES];
         let (_, tox_id) = ToxId::from_bytes(tox_id_slice).expect("deserialize tox_id failed.");
 
-        return (dht_sk, real_sk, tox_id);
+        (dht_sk, real_sk, tox_id)
     }else {
         let mut rng = thread_rng();
 
@@ -81,11 +81,11 @@ fn load_or_gen_keys() -> (SecretKey, SecretKey, ToxId) {
         real_sk_buffer.copy_from_slice(real_sk_bytes);
 
         let real_pk = real_sk.public_key();
-        let tox_id = ToxId::new(&mut rng, real_pk.clone());
+        let tox_id = ToxId::new(&mut rng, real_pk);
         tox_id.to_bytes((tox_id_buffer, 0)).unwrap();
 
         fs::write(key_file, buffer).expect("write tox_proxy_server.data failed.");
-        return (dht_sk, real_sk, tox_id);
+        (dht_sk, real_sk, tox_id)
     }
 }
 
@@ -93,7 +93,7 @@ fn load_server_message() -> Vec<u8> {
     let message_file = "tox_proxy_server_message.data";
     if Path::new(message_file).exists() {
         let raw = fs::read(message_file).expect("read tox_proxy_server.data failed.");
-        return raw;
+        raw
     }else{
         return "hi from server".as_bytes().to_vec();
     }
@@ -103,7 +103,7 @@ fn load_server_message() -> Vec<u8> {
 async fn main() -> Result<(), Error> {
     env_logger::init();
 
-    let mut server_message = load_server_message();
+    let server_message = load_server_message();
 
     let (dht_sk, real_sk, id) = load_or_gen_keys();
     let dht_pk = dht_sk.public_key();
