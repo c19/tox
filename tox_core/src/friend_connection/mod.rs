@@ -106,9 +106,9 @@ impl Friend {
 #[derive(Clone)]
 pub struct FriendConnections {
     /// Our long term `SecretKey`.
-    real_sk: SecretKey,
+    #[allow(dead_code)] real_sk: SecretKey,
     /// Our long term `PublicKey`.
-    real_pk: PublicKey,
+    #[allow(dead_code)] real_pk: PublicKey,
     /// List of friends we want to be connected to.
     friends: Arc<RwLock<HashMap<PublicKey, Friend>>>,
     /// Sink to send a connection status when it becomes connected or
