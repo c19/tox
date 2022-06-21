@@ -103,3 +103,10 @@ Licensed under [GPLv3+](/LICENSE) with [Apple app store exception](/COPYING.iOS)
 [Rust]: https://www.rust-lang.org/
 [VSBuild]: https://visualstudio.microsoft.com/downloads/
 [toxcore]: https://github.com/TokTok/c-toxcore
+
+## Get Nodes
+
+```
+curl 'https://nodes.tox.chat/json' -s | jq -r '.nodes[] | .public_key + " " + .ipv4 + ":" + (.port | tostring)' | \
+while read pk addr; do echo "(\"$pk\", \"$addr\"),"; done
+```
