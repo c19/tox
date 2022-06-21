@@ -36,19 +36,6 @@ use tox_core::stats::Stats;
 
 mod common;
 
-// const TCP_RELAYS: [(&str, &str); 5] = [
-//     // ray65536
-//     ("8E7D0B859922EF569298B4D261A8CCB5FEA14FB91ED412A7603A585A25698832", "85.172.30.117:33445"),
-//     // MAH69K
-//     ("DA4E4ED4B697F2E9B000EEFE3A34B554ACD3F45F5C96EAEA2516DD7FF9AF7B43", "185.25.116.107:33445"),
-//     // Deliran
-//     ("1C5293AEF2114717547B39DA8EA6F1E331E5E358B35F9B6B5F19317911C5F976", "84.22.115.205:33445"),
-//     // kpp
-//     ("A04F5FE1D006871588C8EC163676458C1EC75B20B4A147433D271E1E85DAF839", "52.53.185.100:33445"),
-//     // kurnevsky
-//     ("82EF82BA33445A1F91A7DB27189ECFC0C013E06E3DA71F588ED692BED625EC23", "37.139.29.40:33445"),
-// ];
-
 fn load_or_gen_keys() -> (SecretKey, SecretKey, ToxId) {
     const BUFFER_SIZE: usize = KEY_SIZE*2+TOXIDBYTES;
     let key_file = "tox_proxy_server.data";
@@ -178,6 +165,16 @@ async fn main() -> Result<(), Error> {
         onion_client.add_path_node(node).await;
     }
 
+    // Add TCP relays
+    for &(pk, saddr) in &common::BOOTSTRAP_NODES {
+        // get PK bytes of the relay
+        let relay_pk_bytes: [u8; 32] = FromHex::from_hex(pk).unwrap();
+        // create PK from bytes
+        let relay_pk = PublicKey::from(relay_pk_bytes);
+
+        tcp_connections.add_relay_global(saddr.parse().unwrap(), relay_pk).await.map_err(Error::from)?;
+    }
+
     let mut udp_server = UdpServer::new(dht_server);
     udp_server.set_net_crypto(net_crypto.clone());
     udp_server.set_onion_client(onion_client.clone());
@@ -275,16 +272,6 @@ async fn main() -> Result<(), Error> {
         }
         Result::<(), Error>::Ok(())
     };
-
-    // Add TCP relays
-    // for &(pk, saddr) in TCP_RELAYS.iter() {
-    //     // get PK bytes of the relay
-    //     let relay_pk_bytes: [u8; 32] = FromHex::from_hex(pk).unwrap();
-    //     // create PK from bytes
-    //     let relay_pk = PublicKey::from(relay_pk_bytes);
-
-    //     tcp_connections.add_relay_global(saddr.parse().unwrap(), relay_pk).await.map_err(Error::from)?;
-    // }
 
     futures::select!(
         res = dht_run_socket(&udp_server, socket, rx, stats).fuse() => res.map_err(Error::from),

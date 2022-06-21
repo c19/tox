@@ -315,7 +315,7 @@ impl Client {
             ref mut status => *status = ClientStatus::Disconnected,
         }
         if let Err(ref e) = result {
-            error!("TCP relay connection error: {}", e);
+            error!("TCP relay connection error: {} {}", self.addr, e);
             let mut connection_attempts = self.connection_attempts.write().await;
             *connection_attempts = connection_attempts.saturating_add(1);
         }
