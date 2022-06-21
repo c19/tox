@@ -226,7 +226,7 @@ impl FriendConnections {
                 friend.dht_pk_time = Some(clock_now());
 
                 if friend.dht_pk.as_ref() != Some(&dht_pk) {
-                    warn!("Found a friend's DHT key: {:?} {:?}", friend.real_pk, dht_pk);
+                    info!("Found a friend's DHT key: {:?} {:?}", friend.real_pk, dht_pk);
 
                     if let Some(ref dht_pk) = friend.dht_pk {
                         dht.remove_friend(dht_pk.clone()).await;
@@ -269,8 +269,7 @@ impl FriendConnections {
                 friend.saddr_time = Some(clock_now());
 
                 if friend.saddr != Some(node.saddr) {
-                    info!("Found a friend's IP address");
-                    warn!("Found a friend's IP address {:?}", node.saddr);
+                    info!("Found a friend's IP address {:?}", node.saddr);
 
                     friend.saddr = Some(node.saddr);
 
@@ -385,8 +384,6 @@ impl FriendConnections {
                     if let Some(saddr) = friend.saddr {
                         self.net_crypto.set_friend_udp_addr(friend.real_pk.clone(), saddr).await;
                     }
-                    // got friend's dht pk, tries to send friend request
-
                 }
             }
         }
